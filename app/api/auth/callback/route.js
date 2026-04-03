@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { settings } from "@/lib/schema";
+import { settings, license } from "@/lib/schema";
+import { eq } from "drizzle-orm";
+
+const DEVELOPER_EMAIL = "prasad.kamta@gmail.com";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -24,6 +27,21 @@ export async function GET(request) {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
   const user = await userRes.json();
+
+  if (!user.email) return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/login`);
+
+  if (user.email !== DEVELOPER_EMAIL) {
+    const rows = await db.select().from(license).where(eq(license.email, user.email));
+
+    if (!rows.length || !rows[0].active) {
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/expired`);
+    }
+
+    const expiresAt = rows[0].expires_at;
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/expired`);
+    }
+  }
 
   const allSettings = await db.select().from(settings);
   const isSetup = allSettings.length > 0 && allSettings[0].hotel_name;
