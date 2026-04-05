@@ -1,11 +1,11 @@
-import { createClient } from "@libsql/client";
-
-const db = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
-});
-
 export async function POST(request) {
+  const { createClient } = await import("@libsql/client");
+
+  const db = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
+
   const body = await request.json();
   const { email, name, months, secret } = body;
 
