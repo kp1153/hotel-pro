@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { settings, license } from "@/lib/schema";
+import { settings, users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
 
 const DEVELOPER_EMAIL = "prasad.kamta@gmail.com";
@@ -31,15 +31,27 @@ export async function GET(request) {
   if (!user.email) return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/login`);
 
   if (user.email !== DEVELOPER_EMAIL) {
-    const rows = await db.select().from(license).where(eq(license.email, user.email));
+    const existing = await db.select().from(users).where(eq(users.email, user.email));
 
-    if (!rows.length || !rows[0].active) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/expired`);
-    }
-
-    const expiresAt = rows[0].expires_at;
-    if (expiresAt && new Date(expiresAt) < new Date()) {
-      return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/expired`);
+    if (existing.length === 0) {
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + 7);
+      await db.insert(users).values({
+        email: user.email,
+        name: user.name || "",
+        status: "trial",
+        expiryDate: expiry.toISOString(),
+        reminderSent: 0,
+      });
+    } else {
+      const u = existing[0];
+      const now = new Date();
+      const expiry = u.expiryDate ? new Date(u.expiryDate) : null;
+      const isActive = u.status === "active" && expiry && expiry > now;
+      const isTrial = u.status === "trial" && expiry && expiry > now;
+      if (!isActive && !isTrial) {
+        return NextResponse.redirect(`${process.env.NEXT_PUBLIC_BASE_URL}/expired`);
+      }
     }
   }
 
@@ -54,5 +66,6 @@ export async function GET(request) {
 
   response.cookies.set("role", "owner", { httpOnly: true, maxAge: 60 * 60 * 24 * 7 });
   response.cookies.set("owner_name", user.name || "Owner", { httpOnly: true, maxAge: 60 * 60 * 24 * 7 });
+  response.cookies.set("owner_email", user.email, { httpOnly: true, maxAge: 60 * 60 * 24 * 7 });
   return response;
 }
