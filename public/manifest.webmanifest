@@ -2,7 +2,7 @@
   "name": "Nishant Hotel Pro",
   "short_name": "Hotel Pro",
   "description": "Hotel management software — Rooms, Bookings, Billing, Staff",
-  "start_url": "/",
+  "start_url": "/login",
   "display": "standalone",
   "background_color": "#030712",
   "theme_color": "#0a0f1e",
