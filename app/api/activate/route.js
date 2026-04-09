@@ -1,17 +1,19 @@
 export async function POST(request) {
-  const { createClient } = await import("@libsql/client");
+  const authHeader = request.headers.get("Authorization");
+  const secret = process.env.ACTIVATION_SECRET;
 
+  if (!authHeader || authHeader !== `Bearer ${secret}`) {
+    return Response.json({ success: false, error: "unauthorized" }, { status: 401 });
+  }
+
+  const { createClient } = await import("@libsql/client");
   const db = createClient({
-    url: process.env.TURSO_DATABASE_URL,
+    url: process.env.TURSO_URL,
     authToken: process.env.TURSO_AUTH_TOKEN,
   });
 
   const body = await request.json();
-  const { email, name, months, secret } = body;
-
-  if (secret !== process.env.ACTIVATION_SECRET) {
-    return Response.json({ success: false, error: "unauthorized" }, { status: 401 });
-  }
+  const { email, name, months } = body;
 
   if (!email) return Response.json({ success: false, error: "email required" }, { status: 400 });
 
