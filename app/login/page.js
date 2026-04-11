@@ -8,7 +8,7 @@ export default function LoginPage() {
           <p className="text-gray-400 text-sm mt-1">Hotel Management Software</p>
         </div>
         <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 flex flex-col gap-4">
-          <a href="/api/auth/google"
+          <a href="/api/auth/login"
             className="flex items-center justify-center gap-3 bg-white text-gray-900 font-bold py-3 rounded-xl hover:bg-gray-100 transition">
             <svg width="20" height="20" viewBox="0 0 48 48">
               <path fill="#FFC107" d="M43.6 20H24v8h11.3C33.7 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34.1 6.5 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 20-9 20-20 0-1.3-.1-2.7-.4-4z"/>

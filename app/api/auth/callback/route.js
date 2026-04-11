@@ -1,73 +1,75 @@
-import { NextResponse } from "next/server";
+import { google } from "@/lib/auth";
+import { createSession } from "@/lib/session";
 import { db } from "@/lib/db";
-import { settings, users } from "@/lib/schema";
+import { users } from "@/lib/schema";
 import { eq } from "drizzle-orm";
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 const DEVELOPER_EMAIL = "prasad.kamta@gmail.com";
-const BASE_URL = "https://hotel-pro-ten.vercel.app";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
-  if (!code) return NextResponse.redirect(`${BASE_URL}/login`);
+  const state = searchParams.get("state");
 
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      code,
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: "https://hotel-pro-ten.vercel.app/api/auth/callback",
-      grant_type: "authorization_code",
-    }),
-  });
+  const cookieStore = await cookies();
+  const storedState = cookieStore.get("oauth_state")?.value;
+  const codeVerifier = cookieStore.get("code_verifier")?.value;
 
-  const tokens = await tokenRes.json();
-  const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
-    headers: { Authorization: `Bearer ${tokens.access_token}` },
-  });
-  const user = await userRes.json();
-
-  if (!user.email) return NextResponse.redirect(`${BASE_URL}/login`);
-
-  if (user.email === DEVELOPER_EMAIL) {
-    const response = NextResponse.redirect(`${BASE_URL}/dashboard`);
-    response.cookies.set("role", "owner", { httpOnly: true, maxAge: 60 * 60 * 24 * 7 });
-    response.cookies.set("owner_name", user.name || "Owner", { httpOnly: true, maxAge: 60 * 60 * 24 * 7 });
-    response.cookies.set("owner_email", user.email, { httpOnly: true, maxAge: 60 * 60 * 24 * 7 });
-    return response;
+  if (!code || state !== storedState) {
+    return new Response("Invalid state", { status: 400 });
   }
 
-  const existing = await db.select().from(users).where(eq(users.email, user.email));
+  const tokens = await google.validateAuthorizationCode(code, codeVerifier);
+  const accessToken = tokens.accessToken();
+
+  const googleRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const googleUser = await googleRes.json();
+
+  if (!googleUser.email) return NextResponse.redirect(new URL("/login", request.url));
+
+  const existing = await db.select().from(users).where(eq(users.email, googleUser.email));
+  let user;
 
   if (existing.length === 0) {
     const expiry = new Date();
     expiry.setDate(expiry.getDate() + 7);
-    await db.insert(users).values({
-      email: user.email,
-      name: user.name || "",
-      status: "trial",
+    const inserted = await db.insert(users).values({
+      email: googleUser.email,
+      name: googleUser.name || "",
+      status: googleUser.email === DEVELOPER_EMAIL ? "active" : "trial",
       expiryDate: expiry.toISOString(),
       reminderSent: 0,
-    });
+    }).returning();
+    user = inserted[0];
   } else {
-    const u = existing[0];
-    const now = new Date();
-    const expiry = u.expiryDate ? new Date(u.expiryDate) : null;
-    const isActive = u.status === "active" && expiry && expiry > now;
-    const isTrial = u.status === "trial" && expiry && expiry > now;
-    if (!isActive && !isTrial) {
-      return NextResponse.redirect(`${BASE_URL}/expired`);
+    user = existing[0];
+    if (googleUser.email !== DEVELOPER_EMAIL) {
+      const expiry = user.expiryDate ? new Date(user.expiryDate) : null;
+      const isActive = user.status === "active" && expiry && expiry > new Date();
+      const isTrial = user.status === "trial" && expiry && expiry > new Date();
+      if (!isActive && !isTrial) {
+        return NextResponse.redirect(new URL("/expired", request.url));
+      }
     }
   }
 
-  const allSettings = await db.select().from(settings);
-  const isSetup = allSettings.length > 0 && allSettings[0].hotel_name;
+  const token = await createSession(user.id, user.email, user.name, user.status, user.expiryDate);
 
-  const response = NextResponse.redirect(isSetup ? `${BASE_URL}/dashboard` : `${BASE_URL}/setup`);
-  response.cookies.set("role", "owner", { httpOnly: true, maxAge: 60 * 60 * 24 * 7 });
-  response.cookies.set("owner_name", user.name || "Owner", { httpOnly: true, maxAge: 60 * 60 * 24 * 7 });
-  response.cookies.set("owner_email", user.email, { httpOnly: true, maxAge: 60 * 60 * 24 * 7 });
+  const response = NextResponse.redirect(new URL("/dashboard", request.url));
+  response.cookies.set("session", token, {
+    httpOnly: true,
+    maxAge: 60 * 60 * 24 * 7,
+    path: "/",
+    sameSite: "lax",
+    secure: true,
+  });
+  response.cookies.set("role", "owner", { httpOnly: true, maxAge: 60 * 60 * 24 * 7, path: "/" });
+  response.cookies.set("owner_email", googleUser.email, { httpOnly: true, maxAge: 60 * 60 * 24 * 7, path: "/" });
+  response.cookies.set("owner_name", googleUser.name || "", { httpOnly: true, maxAge: 60 * 60 * 24 * 7, path: "/" });
+
   return response;
 }
