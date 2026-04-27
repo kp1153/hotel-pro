@@ -1,32 +1,46 @@
-export default function ExpiredPage() {
+import { getSession } from "@/lib/session";
+
+export const dynamic = "force-dynamic";
+
+export default async function Expired() {
+  const session = await getSession();
+  const email = session?.email || "";
+  const hubUrl = `https://nishantsoftwares.in/payment?software=hotel&email=${encodeURIComponent(email)}`;
+
   return (
     <main className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-sm text-center">
-        <div className="text-5xl mb-4">⏰</div>
-        <h1 className="text-2xl font-extrabold text-white mb-2">License Expired</h1>
-        <p className="text-gray-400 text-sm mb-6">
-          आपका subscription समाप्त हो गया है। दोबारा शुरू करने के लिए संपर्क करें।
-        </p>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 flex flex-col gap-3">
+      <div className="max-w-md w-full text-center">
+        <div className="bg-gray-900 border border-gray-800 rounded-3xl shadow-lg p-8">
+          <div className="text-6xl mb-4">⏰</div>
+          <h1 className="text-2xl font-bold text-white mb-2">
+            ट्रायल समाप्त
+          </h1>
+          <p className="text-gray-400 text-sm mb-6">
+            आपका ७ दिन का निःशुल्क ट्रायल समाप्त हो गया है। Hotel Pro आगे चलाने के लिए कृपया लाइसेंस खरीदें।
+          </p>
+
+          <div className="bg-gray-800 rounded-2xl p-4 mb-6 text-left">
+            <p className="text-sm font-semibold text-amber-400 mb-1">Hotel Pro लाइसेंस</p>
+            <p className="text-2xl font-extrabold text-white mb-1">
+              ₹4,999 <span className="text-sm font-normal text-gray-400">/ साल</span>
+            </p>
+            <p className="text-xs text-gray-500">नवीनीकरण: ₹2,500 / साल</p>
+          </div>
+
           <a
-            href="https://wa.me/919996865069?text=Hotel Pro renew करना है"
+            href={hubUrl}
+            className="block w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-3 rounded-2xl transition mb-3"
+          >
+            अभी खरीदें
+          </a>
+
+          <a
+            href="https://wa.me/919996865069"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 bg-green-600 text-white font-bold py-3 rounded-xl hover:bg-green-500 transition"
+            className="block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-2xl transition"
           >
-            💬 WhatsApp पर Renew करें
-          </a>
-          <a
-            href="tel:+919996865069"
-            className="flex items-center justify-center gap-2 bg-gray-800 text-white font-bold py-3 rounded-xl hover:bg-gray-700 transition border border-gray-700"
-          >
-            📞 9996865069
-          </a>
-          <a
-            href="/login"
-            className="text-xs text-gray-500 hover:text-gray-400 transition mt-1"
-          >
-            ← वापस Login पर जाएँ
+            WhatsApp सहायता
           </a>
         </div>
       </div>
